@@ -7,7 +7,7 @@ import com.typesafe.config.Config
 class AerospikeAsyncClientBuilder(conf: AerospikeClientConf) {
 
   def build(): AerospikeClient = {
-    val clientPolicy = conf.clientPolicyConf.getClientPolicy
+    val clientPolicy = conf.clientPolicy.getClientPolicy
     val hostName = conf.hostname
     val port = conf.port
     val hosts = conf.hosts

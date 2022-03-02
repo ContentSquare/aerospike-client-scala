@@ -6,11 +6,6 @@ networks:
 services:
   aerospike:
     image: 'docker.artifactory.csq.fr/aerospike/aerospike-server-enterprise:5.6.0.7'
-    ports:
-      - '3100:3100'
-      - '3101:3101'
-      - '3102:3102'
-      - '3103:3103'
     volumes:
       - ./aerospike/aerospike.conf:/opt/aerospike/etc/aerospike.conf
       - ./aerospike/features/features.conf:/opt/aerospike/etc/features.conf

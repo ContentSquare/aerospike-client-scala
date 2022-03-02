@@ -3,6 +3,9 @@ package io.github.reugn.aerospike.scala.cs
 import com.aerospike.client.async.{EventLoopType, EventPolicy}
 import com.aerospike.client.policy.{AuthMode, ClientPolicy}
 import com.typesafe.config.Config
+import pureconfig.{ConfigObjectSource, ConfigSource, ConfigReader, loadConfig, CamelCase, ConfigFieldMapping}
+import pureconfig.generic.auto._
+import pureconfig.generic.{ProductHint}
 
 
 final case class EventLoopConf(
@@ -44,7 +47,7 @@ object EventLoopConf {
 
 
 final case class ClientPolicyConf(
-                                   eventLoopConf: EventLoopConf,
+                                   eventLoop: EventLoopConf,
                                    user: String,
                                    password: String,
                                    clusterName: String,
@@ -63,7 +66,7 @@ final case class ClientPolicyConf(
                                    failIfNotConnected: Boolean
                                  ) {
 
-  lazy val eventLoops = EventLoopsBuilder.createEventLoops(eventLoopConf)
+  lazy val eventLoops = EventLoopsBuilder.createEventLoops(eventLoop)
   lazy val clientPolicy = getClientPolicy
 
   def getClientPolicy: ClientPolicy = {
@@ -116,9 +119,9 @@ final case class AerospikeClientConf(
                                       hosts: String,
                                       hostname: String,
                                       port: Int,
-                                      clientPolicyConf: ClientPolicyConf
+                                      clientPolicy: ClientPolicyConf
                                     ) {
-  val eventLoops = clientPolicyConf.eventLoops
+  val eventLoops = clientPolicy.eventLoops
 }
 
 object AerospikeClientConf {
@@ -127,97 +130,22 @@ object AerospikeClientConf {
   val defaultHosts = ""
 
   def apply(config: Config): AerospikeClientConf = {
-    val defaultEventLoopConf = EventLoopConf.defaultEventLoopConf()
-    val defaultClientPolicyConf = ClientPolicyConf.defaultClientPolicyConf()
-    val defaultAerospikeClientConf = AerospikeClientConf.defaultAerospikeClientConf()
+    loadWithSource(ConfigSource.fromConfig(config))
+  }
 
-    val aerospikeConfig = config.getConfig("aerospike")
-    val clientPolicyConfig = aerospikeConfig.getConfig("clientpolicy")
-    val eventLoopConfig = clientPolicyConfig.getConfig("eventloop")
-    val eventLoopConf = EventLoopConf(
-      getEventLoopThreads(getIntParam(eventLoopConfig, "threadNumbers").getOrElse(defaultEventLoopConf.threadNumbers)),
-      EventLoopType.valueOf(
-        getStringParam(eventLoopConfig, "eventLoopType").getOrElse(defaultEventLoopConf.eventLoopType.toString)),
-      getIntParam(
-        eventLoopConfig, "maxCommandsInProcess"
-      ).getOrElse(defaultEventLoopConf.maxCommandsInProcess),
-      getIntParam(
-        eventLoopConfig, "maxCommandsInQueue"
-      ).getOrElse(defaultEventLoopConf.maxCommandsInQueue),
-      getIntParam(
-        eventLoopConfig, "queueInitialCapacity"
-      ).getOrElse(defaultEventLoopConf.queueInitialCapacity),
-      getIntParam(
-        eventLoopConfig, "minTimeout"
-      ).getOrElse(defaultEventLoopConf.minTimeout),
-      getIntParam(
-        eventLoopConfig,
-        "ticksPerWheel").getOrElse(defaultEventLoopConf.ticksPerWheel),
-      getIntParam(
-        eventLoopConfig,
-        "commandsPerEventLoop").getOrElse(defaultEventLoopConf.commandsPerEventLoop)
-    )
+  def apply(source: ConfigObjectSource) : AerospikeClientConf = {
+    loadWithSource(source)
+  }
 
-    val clientPolicyConf = ClientPolicyConf(
-      eventLoopConf,
-      getStringParam(clientPolicyConfig,
-        "user").getOrElse(defaultClientPolicyConf.user),
-      getStringParam(clientPolicyConfig, "password").getOrElse(defaultClientPolicyConf.password),
-      getStringParam(clientPolicyConfig, "clusterName").getOrElse(defaultClientPolicyConf.clusterName),
-      AuthMode.valueOf(getStringParam(clientPolicyConfig, "authMode").getOrElse(defaultClientPolicyConf.authMode.toString)),
-      getIntParam(clientPolicyConfig, "timeout").getOrElse(defaultClientPolicyConf.timeout),
-      getIntParam(clientPolicyConfig, "loginTimeout").getOrElse(defaultClientPolicyConf.loginTimeout),
-      getIntParam(clientPolicyConfig, "minConnsPerNode").getOrElse(defaultClientPolicyConf.minConnsPerNode),
-      getIntParam(clientPolicyConfig, "maxConnsPerNode").getOrElse(defaultClientPolicyConf.maxConnsPerNode),
-      getIntParam(clientPolicyConfig, "asyncMinConnsPerNode").getOrElse(defaultClientPolicyConf.asyncMinConnsPerNode),
-      getIntParam(clientPolicyConfig, "asyncMaxConnsPerNode").getOrElse(defaultClientPolicyConf.asyncMaxConnsPerNode),
-      getIntParam(clientPolicyConfig, "connPoolsPerNode").getOrElse(defaultClientPolicyConf.connPoolsPerNode),
-      getIntParam(clientPolicyConfig, "maxSocketIdle").getOrElse(defaultClientPolicyConf.maxSocketIdle),
-      getIntParam(clientPolicyConfig, "maxErrorRate").getOrElse(defaultClientPolicyConf.maxErrorRate),
-      getIntParam(clientPolicyConfig, "errorRateWindow").getOrElse(defaultClientPolicyConf.errorRateWindow),
-      getIntParam(clientPolicyConfig, "tendInterval").getOrElse(defaultClientPolicyConf.tendInterval),
-      getBoolean(clientPolicyConfig, "failIfNotConnected").getOrElse(defaultClientPolicyConf.failIfNotConnected)
-    )
+  def loadWithSource(source: ConfigObjectSource): AerospikeClientConf = {
+    implicit def hint[A] = ProductHint[A](ConfigFieldMapping(CamelCase, CamelCase))
 
-    AerospikeClientConf(
-      getStringParam(aerospikeConfig, "hostList").getOrElse(defaultAerospikeClientConf.hosts),
-      getStringParam(aerospikeConfig, "hostname").getOrElse(defaultAerospikeClientConf.hostname),
-      getIntParam(aerospikeConfig, "port").getOrElse(defaultAerospikeClientConf.port),
-      clientPolicyConf
-    )
+    val defaultSource: ConfigObjectSource = ConfigSource.resources("reference-default.conf")
+   source.withFallback(defaultSource).at("aerospike")
+      .loadOrThrow[AerospikeClientConf]
   }
 
   def defaultAerospikeClientConf(): AerospikeClientConf = {
     AerospikeClientConf(defaultHosts, defaultHostName, defaultPort, ClientPolicyConf.defaultClientPolicyConf())
-  }
-
-  private def getIntParam(config: Config, key: String): Option[Int] = {
-    try {
-      Option(config.getInt(key))
-    } catch {
-      case _: Throwable => None
-    }
-  }
-
-  private def getStringParam(config: Config, key: String): Option[String] = {
-    try {
-      Option(config.getString(key))
-    } catch {
-      case _: Throwable => None
-    }
-  }
-
-  private def getBoolean(config: Config, key: String): Option[Boolean] = {
-    try {
-      Option(config.getBoolean(key))
-    } catch {
-      case _: Throwable => None
-    }
-  }
-
-  private def getEventLoopThreads(threadNumbers: Int): Int = {
-    val max = Runtime.getRuntime.availableProcessors
-    if (threadNumbers > 0 && threadNumbers <= max) threadNumbers
-    else max
   }
 }
