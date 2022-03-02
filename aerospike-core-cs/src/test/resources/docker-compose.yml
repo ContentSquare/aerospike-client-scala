@@ -14,6 +14,6 @@ services:
     volumes:
       - ./aerospike/aerospike.conf:/opt/aerospike/etc/aerospike.conf
       - ./aerospike/features/features.conf:/opt/aerospike/etc/features.conf
-    command: ["--config-file", "/opt/aerospike/etc/aerospike.conf"]
+    command: [ "--config-file", "/opt/aerospike/etc/aerospike.conf" ]
     networks:
       - as_functional_test

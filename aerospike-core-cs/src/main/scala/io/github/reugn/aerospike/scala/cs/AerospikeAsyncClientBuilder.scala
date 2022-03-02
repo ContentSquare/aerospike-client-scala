@@ -1,18 +1,16 @@
 package io.github.reugn.aerospike.scala.cs
 
+import com.aerospike.client.async.EventLoops
 import com.aerospike.client.{AerospikeClient, Host}
 import com.typesafe.config.Config
 
 class AerospikeAsyncClientBuilder(conf: AerospikeClientConf) {
-  lazy val eventLoops = conf.getEventLoops()
-  val DefaultHostName: String = "localhost"
-  val DefaultPort: Int = 3000
 
   def build(): AerospikeClient = {
     val clientPolicy = conf.clientPolicyConf.getClientPolicy
-    val hostName = if (conf.hostname.isDefined) conf.hostname.get else DefaultHostName
-    val port = if (conf.port.isDefined) conf.port.get else DefaultPort
-    val hosts = if (conf.hosts.isDefined) conf.hosts.get else ""
+    val hostName = conf.hostname
+    val port = conf.port
+    val hosts = conf.hosts
 
     if (hosts != "") {
       new AerospikeClient(clientPolicy,
@@ -32,13 +30,13 @@ object AerospikeAsyncClientBuilder {
   def apply(aerospikeClientConf: AerospikeClientConf): AerospikeAsyncClientBuilder
   = new AerospikeAsyncClientBuilder(aerospikeClientConf)
 
-  def createClient(aerospikeClientConf: AerospikeClientConf): (AerospikeClient, EventLoops) = {
-    val aerospikeClient = (new AerospikeAsyncClientBuilder(aerospikeClientConf)).build()
-    (aerospikeClient, aerospikeClientConf.getEventLoops())
-  }
-
   def createClient(config: Config): (AerospikeClient, EventLoops) = {
     val aerospikeClientConf = AerospikeClientConf(config)
     createClient(aerospikeClientConf)
+  }
+
+  def createClient(aerospikeClientConf: AerospikeClientConf): (AerospikeClient, EventLoops) = {
+    val aerospikeClient = (new AerospikeAsyncClientBuilder(aerospikeClientConf)).build()
+    (aerospikeClient, aerospikeClientConf.eventLoops)
   }
 }

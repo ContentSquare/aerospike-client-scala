@@ -6,7 +6,7 @@ import io.netty.channel.kqueue.KQueueEventLoopGroup
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.incubator.channel.uring.IOUringEventLoopGroup
 
-object EventLoopsProvider {
+object EventLoopsBuilder {
   def createEventLoops(conf: EventLoopConf): EventLoops = {
     val eventPolicy: EventPolicy
     = conf.getEventPolicy
